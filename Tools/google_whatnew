@@ -1,0 +1,62 @@
+from google.cloud import translate_v2 as translate
+from google.oauth2 import service_account
+import requests
+from bs4 import BeautifulSoup
+import six
+
+
+# 检查谷歌云服务是否更新升级新功能，发送通知
+def google_whatnew():
+
+
+cred = service_account.Credentials.from_service_account_file(
+    '/home/wangmingli/tools/translate_v2/spoton-project-5cbd306d05bd.json')
+
+req = requests.get(url="https://cloud.google.com/blog/topics/inside-google-cloud/whats-new-google-cloud")
+req.encoding = "utf-8"
+html = req.text
+soup = BeautifulSoup(req.text, features="html.parser")
+data = soup.find("h3")
+title = data.text.strip()
+print(title)
+
+file = open('update_list.txt', 'w+')
+file.close()
+
+ul = data.next_sibling
+lis = ul.findChildren("li")
+for i, li in enumerate(lis, 1):
+    # tmp = ""
+    # bs = li.findChildren("b")
+    # for b in bs:
+    #     tmp += b.text.strip()
+    # print(tmp)
+    update_one = f"{i}. {li.text.strip()}"
+
+    translate_client = translate.Client(credentials=cred)
+    result = translate_client.translate(update_one, target_language="zh-CN")
+    translate_update_list = result["translatedText"]
+    print(result["translatedText"])
+
+    file = open('update_list.txt', 'a+')
+    file.write(translate_update_list + '\n')
+    file.close()
+
+with open("update_list.txt", "r") as d:
+    update_list = d.read()
+# print(update_list)
+
+url = "https://open.feishu.cn/open-apis/bot/v2/hook/4f619dd1-6762-4b2b-ae11-92d87f5c8e66"
+headers = {'Content-Type': 'application/json'}
+# message = '【谷歌云服务更新通知】 \n【时间】：%s  \n【更新内容】：%s' % (title,update_list)
+# payload = {'msg_type': 'text',
+#           'content': {'text': message}}
+payload = {"msg_type": "interactive", "card": {
+    "header": {"title": {"tag": "plain_text", "content": "谷歌云服务更新通知" + "        " + title},
+        "template": "green"}, "elements": [{"tag": "markdown", "content": update_list}, {"tag": "hr"},
+        {"tag": "markdown",
+            "content": "\n[点击查看详细信息](https://cloud.google.com/blog/topics/inside-google-cloud/whats-new-google-cloud)"}, ]}}
+r = requests.post(url, headers=headers, json=payload)
+
+if __name__ == '__main__':
+    google_whatnew()
